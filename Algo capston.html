@@ -1,0 +1,224 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>ExamColor – Exam Timetable Generator (Graph Coloring + Backtracking)</title>
+<style>
+:root{--bg:#eef2f7;--grid:#dbe3ee;--card:#fff;--ink:#14202e;--mut:#5b6b7e;--line:#cfd8e3;--acc:#1d4ed8;--accbg:#e6edff;--ok:#0f7b4a;--bad:#b42318;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){--bg:#0f1720;--grid:#18222e;--card:#162030;--ink:#e6edf5;--mut:#92a3b8;--line:#2a3a4e;--acc:#7da4ff;--accbg:#1e2f52;--ok:#4fd195;--bad:#ff8a7a}}
+:root[data-theme="dark"]{--bg:#0f1720;--grid:#18222e;--card:#162030;--ink:#e6edf5;--mut:#92a3b8;--line:#2a3a4e;--acc:#7da4ff;--accbg:#1e2f52;--ok:#4fd195;--bad:#ff8a7a}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background-color:var(--bg);background-image:linear-gradient(var(--grid) 1px,transparent 1px),linear-gradient(90deg,var(--grid) 1px,transparent 1px);background-size:28px 28px;color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{padding:28px 20px 8px;max-width:1280px;margin:auto}
+h1{font:700 34px/1.1 Georgia,"Times New Roman",serif;margin:0 0 6px;letter-spacing:-.5px}
+header p{margin:0;color:var(--mut);max-width:70ch}
+main{max-width:1280px;margin:auto;padding:14px 20px 40px;display:grid;grid-template-columns:340px 1fr;gap:18px}
+@media(max-width:900px){main{grid-template-columns:1fr}}
+.card{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:16px;min-width:0}
+h2{font:600 16px/1.3 Georgia,serif;margin:0 0 10px}
+label{display:block;font-size:13px;color:var(--mut);margin:10px 0 4px}
+textarea,input,select{width:100%;font:inherit;color:var(--ink);background:var(--bg);border:1px solid var(--line);border-radius:6px;padding:8px}
+textarea{height:230px;font:13px/1.45 ui-monospace,Consolas,monospace;resize:vertical}
+.row{display:flex;gap:8px;flex-wrap:wrap}.row>*{flex:1}
+button{font:inherit;font-weight:600;border:1px solid var(--acc);background:var(--acc);color:#fff;border-radius:6px;padding:9px 12px;cursor:pointer}
+button.alt{background:transparent;color:var(--acc)}button:focus-visible,input:focus-visible,select:focus-visible,textarea:focus-visible{outline:3px solid var(--acc);outline-offset:1px}
+.stats{display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:10px;margin-bottom:18px}
+.stat{background:var(--card);border:1px solid var(--line);border-radius:10px;padding:12px}
+.stat b{display:block;font:700 28px/1.1 Georgia,serif}.stat span{font-size:12.5px;color:var(--mut)}
+.stat.hero{background:var(--acc);border-color:var(--acc);color:#fff}.stat.hero span{color:#dfe8ff}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]) .stat.hero{color:#0f1720}:root:not([data-theme="light"]) .stat.hero span{color:#1d2f55}}
+.right{display:flex;flex-direction:column;gap:18px;min-width:0}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}@media(max-width:1100px){.two{grid-template-columns:1fr}}
+svg{width:100%;height:auto;display:block}
+.scroll{overflow-x:auto}
+table{border-collapse:collapse;width:100%;font-size:13.5px}th,td{text-align:left;padding:7px 9px;border-bottom:1px solid var(--line);vertical-align:top}th{color:var(--mut);font-weight:600}
+.chip{display:inline-block;color:#fff;border-radius:5px;padding:1px 8px;margin:1px 3px 1px 0;font-size:12.5px;font-weight:600}
+.badge{display:inline-block;padding:2px 9px;border-radius:99px;font-size:12.5px;font-weight:700;background:var(--accbg);color:var(--acc)}
+.ok{color:var(--ok)}.bad{color:var(--bad)}.note{font-size:13px;color:var(--mut)}
+.err{color:var(--bad);font-weight:600;margin-top:8px}
+</style>
+</head>
+<body>
+<header>
+  <h1>ExamColor</h1>
+  <p>Automatic exam timetable generator. Subjects are vertices, shared students are edges, and an exam slot is a colour. Backtracking finds the minimum number of slots with no student clash.</p>
+</header>
+<main>
+  <aside class="card" aria-label="Input">
+    <h2>1. Enter enrolment data</h2>
+    <label for="data">One student per line → <code>Name: SUBJ1, SUBJ2, …</code></label>
+    <textarea id="data" spellcheck="false"></textarea>
+    <div class="row">
+      <div><label for="sd">First exam day</label><input type="date" id="sd"></div>
+      <div><label for="spd">Slots per day</label><select id="spd"><option>1</option><option selected>2</option><option>3</option></select></div>
+    </div>
+    <div class="row" style="margin-top:12px">
+      <button id="gen">Generate timetable</button>
+      <button class="alt" id="sample">Sample</button>
+    </div>
+    <h2 style="margin-top:20px">Random data</h2>
+    <div class="row">
+      <div><label for="rn">Subjects</label><input type="number" id="rn" value="10" min="3" max="26"></div>
+      <div><label for="rs">Students</label><input type="number" id="rs" value="18" min="5" max="300"></div>
+    </div>
+    <button class="alt" id="rand" style="margin-top:10px;width:100%">Generate random &amp; solve</button>
+    <div id="err" class="err" role="alert"></div>
+  </aside>
+
+  <div class="right">
+    <section class="stats" id="stats" aria-live="polite"></section>
+    <div class="two">
+      <section class="card"><h2>2. Conflict graph</h2><div id="graph"></div><p class="note">Same colour = same exam slot. No edge joins two nodes of the same colour.</p></section>
+      <section class="card"><h2>3. Exam timetable</h2><div class="scroll" id="tt"></div></section>
+    </div>
+    <div class="two">
+      <section class="card"><h2>4. Student lookup</h2><select id="stu" aria-label="Select student"></select><div class="scroll" id="stuout" style="margin-top:10px"></div></section>
+      <section class="card"><h2>5. Backtracking vs Greedy</h2><div class="scroll" id="cmp"></div><button class="alt" id="bench" style="margin-top:10px">Run benchmark (6–16 subjects)</button><div class="scroll" id="benchout" style="margin-top:10px"></div></section>
+    </div>
+    <section class="card"><h2>How it works</h2>
+      <p class="note" style="margin:0">Order vertices by degree (most constrained first). For k = 1, 2, 3 … try to colour every vertex using ≤ k colours: give a subject the first slot not used by an already-scheduled neighbour; if none fits, <b>backtrack</b>. The first k that works is the minimum number of slots (chromatic number). Pruning: a vertex may only open one new colour at a time (removes symmetric solutions). Worst case O(kⁿ) time, O(n) space; Welsh–Powell greedy is O(n²) but may use more slots.</p>
+    </section>
+  </div>
+</main>
+
+<script>
+/*CORE*/
+function parse(text){
+  const subs=[],idx={},students=[];
+  for(const raw of text.split(/\n/)){
+    const line=raw.trim(); if(!line)continue;
+    const p=line.split(':'); if(p.length<2)continue;
+    const list=[...new Set(p.slice(1).join(':').split(',').map(s=>s.trim().toUpperCase()).filter(Boolean))];
+    for(const s of list) if(!(s in idx)){idx[s]=subs.length;subs.push(s);}
+    students.push({name:p[0].trim(),subs:list.map(s=>idx[s])});
+  }
+  const n=subs.length,adj=Array.from({length:n},()=>new Set());
+  for(const st of students)for(const a of st.subs)for(const b of st.subs)if(a!==b)adj[a].add(b);
+  const edges=[];for(let i=0;i<n;i++)for(const j of adj[i])if(i<j)edges.push([i,j]);
+  return{subs,students,adj:adj.map(s=>[...s]),edges,n};
+}
+function colorK(n,adj,order,k,limit){
+  const col=new Array(n).fill(-1);let nodes=0,aborted=false;
+  function rec(i,used){
+    if(i===n)return true;
+    if(++nodes>limit){aborted=true;return false;}
+    const v=order[i],maxC=Math.min(k,used+1);
+    for(let c=0;c<maxC;c++){
+      let ok=true;for(const u of adj[v])if(col[u]===c){ok=false;break;}
+      if(ok){col[v]=c;if(rec(i+1,Math.max(used,c+1)))return true;col[v]=-1;if(aborted)return false;}
+    }
+    return false;
+  }
+  return{ok:rec(0,0),col,nodes,aborted};
+}
+function greedy(n,adj){
+  const order=[...Array(n).keys()].sort((a,b)=>adj[b].length-adj[a].length),col=new Array(n).fill(-1);let steps=0,m=0;
+  for(const v of order){let c=0;while(adj[v].some(u=>{steps++;return col[u]===c}))c++;col[v]=c;m=Math.max(m,c+1);}
+  return{col,k:m,steps};
+}
+function solve(g,limit=3e6){
+  const t0=performance.now(),{n,adj}=g;
+  if(!n)return{k:0,col:[],nodes:0,ms:0,aborted:false,gr:{k:0,col:[],steps:0},grMs:0};
+  const order=[...Array(n).keys()].sort((a,b)=>adj[b].length-adj[a].length);
+  const g0=performance.now(),gr=greedy(n,adj),grMs=performance.now()-g0;
+  let total=0,res=null,k=g.edges.length?2:1;
+  for(;k<=gr.k;k++){res=colorK(n,adj,order,k,limit);total+=res.nodes;if(res.ok||res.aborted)break;}
+  let aborted=res&&res.aborted&&!res.ok;
+  if(!res||!res.ok){res={col:gr.col};k=gr.k;}   // fall back to greedy if node limit hit
+  return{k,col:res.col,nodes:total,ms:performance.now()-t0,aborted,gr,grMs};
+}
+function clashes(g,col){return g.edges.filter(([a,b])=>col[a]===col[b]).length;}
+/*ENDCORE*/
+
+const PAL=['#2457c5','#c2410c','#15803d','#7e22ce','#be123c','#0e7490','#a16207','#4d7c0f','#a21caf','#475569','#0369a1','#b45309'];
+const $=id=>document.getElementById(id);
+const SAMPLE=`Aarav: DAA, DBMS
+Diya: DAA, CN
+Kabir: DBMS, AI
+Meera: OS, AI
+Rohan: DAA, SE, PHYSICS
+Sana: MATHS, PHYSICS
+Vivek: CN, SE
+Isha: AI, MATHS
+Tara: PHYSICS, OS
+Yash: DBMS, SE
+Neha: OS, CN
+Arjun: MATHS, DAA
+Pooja: AI, SE`;
+let G=null,R=null;
+
+function esc(s){return s.replace(/[&<>"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));}
+function slotLabel(s){
+  const spd=+$('spd').value,d0=$('sd').value?new Date($('sd').value+'T00:00'):new Date();
+  let day=Math.floor(s/spd),d=new Date(d0);
+  while(d.getDay()===0||d.getDay()===6)d.setDate(d.getDate()+1);
+  for(let i=0;i<day;i++){d.setDate(d.getDate()+1);while(d.getDay()===0||d.getDay()===6)d.setDate(d.getDate()+1);}
+  const times=spd===1?['10:00 AM']:spd===2?['10:00 AM','2:00 PM']:['9:00 AM','12:30 PM','4:00 PM'];
+  return d.toLocaleDateString('en-IN',{weekday:'short',day:'numeric',month:'short'})+' · '+times[s%spd];
+}
+const chip=(s,c)=>`<span class="chip" style="background:${PAL[c%PAL.length]}">${esc(s)}</span>`;
+
+function run(){
+  $('err').textContent='';
+  G=parse($('data').value);
+  if(G.n<2){$('err').textContent='Enter at least one student with two or more subjects.';return;}
+  R=solve(G);render();
+}
+function render(){
+  const bad=clashes(G,R.col);
+  $('stats').innerHTML=`
+   <div class="stat hero"><b>${R.k}</b><span>Exam slots needed${R.aborted?' (greedy fallback)':''}</span></div>
+   <div class="stat"><b>${G.n}</b><span>Subjects (vertices)</span></div>
+   <div class="stat"><b>${G.edges.length}</b><span>Clash pairs (edges)</span></div>
+   <div class="stat"><b>${G.students.length}</b><span>Students</span></div>
+   <div class="stat"><b>${R.nodes.toLocaleString()}</b><span>Backtracking nodes · ${R.ms.toFixed(2)} ms</span></div>
+   <div class="stat"><b class="${bad?'bad':'ok'}">${bad?bad:'0'}</b><span>${bad?'Clashes found':'Student clashes · verified'}</span></div>`;
+  // graph
+  const W=420,H=380,cx=W/2,cy=H/2,r=Math.min(W,H)/2-34,pos=G.subs.map((_,i)=>[cx+r*Math.cos(2*Math.PI*i/G.n-Math.PI/2),cy+r*Math.sin(2*Math.PI*i/G.n-Math.PI/2)]);
+  const nr=G.n>16?14:20;
+  $('graph').innerHTML=`<svg viewBox="0 0 ${W} ${H}" role="img" aria-label="Conflict graph coloured by exam slot">`+
+   G.edges.map(([a,b])=>`<line x1="${pos[a][0]}" y1="${pos[a][1]}" x2="${pos[b][0]}" y2="${pos[b][1]}" stroke="var(--line)" stroke-width="1.5"/>`).join('')+
+   G.subs.map((s,i)=>`<g><title>${esc(s)} → ${slotLabel(R.col[i])}</title><circle cx="${pos[i][0]}" cy="${pos[i][1]}" r="${nr}" fill="${PAL[R.col[i]%PAL.length]}" stroke="var(--card)" stroke-width="2"/><text x="${pos[i][0]}" y="${pos[i][1]+4}" text-anchor="middle" font-size="${G.n>16?7:9}" font-weight="700" fill="#fff">${esc(s.slice(0,5))}</text></g>`).join('')+`</svg>`;
+  // timetable
+  let rows='';for(let c=0;c<R.k;c++){const ss=G.subs.map((s,i)=>R.col[i]===c?chip(s,c):'').join('');rows+=`<tr><td><span class="badge">Slot ${c+1}</span></td><td>${slotLabel(c)}</td><td>${ss}</td></tr>`;}
+  $('tt').innerHTML=`<table><tr><th>Slot</th><th>Date &amp; time</th><th>Subjects</th></tr>${rows}</table>`;
+  // students
+  $('stu').innerHTML=G.students.map((s,i)=>`<option value="${i}">${esc(s.name)}</option>`).join('');showStu();
+  // comparison
+  $('cmp').innerHTML=`<table><tr><th></th><th>Backtracking</th><th>Greedy (Welsh–Powell)</th></tr>
+   <tr><td>Slots used</td><td><b>${R.k}</b></td><td><b>${R.gr.k}</b></td></tr>
+   <tr><td>Work done</td><td>${R.nodes.toLocaleString()} nodes</td><td>${R.gr.steps.toLocaleString()} checks</td></tr>
+   <tr><td>Time</td><td>${R.ms.toFixed(2)} ms</td><td>${R.grMs.toFixed(3)} ms</td></tr>
+   <tr><td>Optimal?</td><td class="ok">Yes${R.aborted?' (limit hit)':''}</td><td>${R.gr.k===R.k?'Matched here':'Not guaranteed'}</td></tr></table>`;
+}
+function showStu(){
+  if(!G)return;const s=G.students[+$('stu').value];if(!s)return;
+  const rows=s.subs.map(i=>[R.col[i],G.subs[i]]).sort((a,b)=>a[0]-b[0]).map(([c,n])=>`<tr><td>${slotLabel(c)}</td><td>${chip(n,c)}</td></tr>`).join('');
+  $('stuout').innerHTML=`<table><tr><th>When</th><th>Exam</th></tr>${rows}</table>`;
+}
+// seeded random
+function rng(seed){return()=>(seed=(seed*1664525+1013904223)>>>0)/4294967296;}
+function randomData(ns,nst,rnd){
+  const codes=Array.from({length:ns},(_,i)=>'S'+String(i+1).padStart(2,'0')),out=[];
+  for(let i=1;i<=nst;i++){const pick=new Set(),m=2+Math.floor(rnd()*2);while(pick.size<Math.min(m,ns))pick.add(codes[Math.floor(rnd()*ns)]);out.push('Student'+i+': '+[...pick].join(', '));}
+  return out.join('\n');
+}
+function bench(){
+  let h='<table><tr><th>Subjects</th><th>Edges</th><th>BT slots</th><th>Greedy</th><th>BT nodes</th><th>BT ms</th></tr>';
+  for(const n of [6,8,10,12,14,16]){
+    const g=parse(randomData(n,Math.round(n*1.6),rng(n*7+1))),r=solve(g);
+    h+=`<tr><td>${n}</td><td>${g.edges.length}</td><td>${r.k}</td><td>${r.gr.k}</td><td>${r.nodes.toLocaleString()}</td><td>${r.ms.toFixed(2)}</td></tr>`;
+  }
+  $('benchout').innerHTML=h+'</table><p class="note">Nodes explored grow quickly with graph size and density, which is the exponential worst case of backtracking.</p>';
+}
+$('gen').onclick=run;
+$('sample').onclick=()=>{$('data').value=SAMPLE;run();};
+$('rand').onclick=()=>{const ns=Math.max(3,Math.min(26,+$('rn').value||10)),st=Math.max(5,+$('rs').value||40);$('data').value=randomData(ns,st,rng(Date.now()&0xffff));run();};
+$('stu').onchange=showStu;$('bench').onclick=bench;$('spd').onchange=()=>G&&render();$('sd').onchange=()=>G&&render();
+$('sd').value=new Date(Date.now()+864e5*7).toISOString().slice(0,10);
+$('data').value=SAMPLE;run();
+</script>
+</body>
+</html>
